@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apex 2D Aim Trainer</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Phosphor Icons for UI Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Inter:wght@300;400;600;700&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0b0f19;
+            color: #f3f4f6;
+            user-select: none;
+            overflow: hidden;
+        }
+
+        .font-orbitron {
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        /* Custom Scrollbar for Settings Panel */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #38bdf8;
+            border-radius: 3px;
+        }
+
+        /* Canvas Lock Cursor Simulation */
+        .game-canvas-container {
+            cursor: none;
+        }
+
+        /* Glow & Neon Effects */
+        .sky-glow {
+            box-shadow: 0 0 15px rgba(56, 189, 248, 0.5), inset 0 0 10px rgba(56, 189, 248, 0.3);
+        }
+        .text-glow {
+            text-shadow: 0 0 8px rgba(56, 189, 248, 0.6);
+        }
+
+        /* Custom Range Input Styling */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: #1e293b;
+            border-radius: 4px;
+            height: 6px;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #38bdf8;
+            cursor: pointer;
+            box-shadow: 0 0 8px #38bdf8;
+            transition: transform 0.1s ease;
+        }
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col justify-between overflow-hidden bg-slate-950 text-slate-100">
+
+    <!-- TOP HEADER / DASHBOARD -->
+    <header class="w-full bg-slate-900/80 backdrop-blur-md border-b border-slate-800 px-6 py-3 flex justify-between items-center z-20">
+        <div class="flex items-center gap-3">
+            <div class="p-2 bg-sky-500/20 rounded-lg border border-sky-500/30 text-sky-400">
+                <i class="ph-bold ph-crosshair text-2xl"></i>
+            </div>
+            <div>
+                <h1 class="font-orbitron text-xl font-bold tracking-wider text-sky-400 text-glow">APEX AIM LAB</h1>
+                <p class="text-xs text-slate-400">2D Precision Target Trainer</p>
+            </div>
+        </div>
+
+        <!-- REAL-TIME STATS BAR -->
+        <div class="hidden md:flex items-center gap-8 bg-slate-950/60 px-6 py-2 rounded-xl border border-slate-800 font-orbitron">
+            <div class="text-center">
+                <div class="text-xs text-slate-400">TIME</div>
+                <div id="stat-time" class="text-lg font-bold text-amber-400">30.0s</div>
+            </div>
+            <div class="w-px h-8 bg-slate-800"></div>
+            <div class="text-center">
+                <div class="text-xs text-slate-400">SCORE</div>
+                <div id="stat-score" class="text-lg font-bold text-sky-400">0</div>
+            </div>
+            <div class="w-px h-8 bg-slate-800"></div>
+            <div class="text-center">
+                <div class="text-xs text-slate-400">ACCURACY</div>
+                <div id="stat-accuracy" class="text-lg font-bold text-emerald-400">100%</div>
+            </div>
+            <div class="w-px h-8 bg-slate-800"></div>
+            <div class="text-center">
+                <div class="text-xs text-slate-400">AVG REACTION</div>
+                <div id="stat-reaction" class="text-lg font-bold text-purple-400">0 ms</div>
+            </div>
+        </div>
+
+        <!-- CONTROLS & SETTINGS TOGGLE -->
+        <div class="flex items-center gap-3">
+            <button id="btn-sound" class="p-2.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 transition" title="Sound Toggle">
+                <i id="icon-sound" class="ph-bold ph-speaker-high text-lg"></i>
+            </button>
+            <button id="btn-settings" class="p-2.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 transition flex items-center gap-2">
+                <i class="ph-bold ph-gear text-lg"></i>
+                <span class="text-xs font-semibold hidden sm:inline">커스텀 설정</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN GAME CANVAS AREA -->
+    <main class="relative flex-1 w-full h-full game-canvas-container overflow-hidden bg-slate-950 flex items-center justify-center">
+        <!-- Canvas Element -->
+        <canvas id="gameCanvas" class="block w-full h-full"></canvas>
+
+        <!-- START / OVERLAY SCREEN -->
+        <div id="overlay-start" class="absolute inset-0 bg-slate-950/80 backdrop-blur-sm flex flex-col items-center justify-center gap-6 z-10 transition-opacity duration-300">
+            <div class="text-center max-w-md px-4">
+                <div class="inline-flex p-4 rounded-full bg-sky-500/10 border border-sky-500/30 text-sky-400 mb-4 animate-pulse">
+                    <i class="ph-bold ph-target text-5xl"></i>
+                </div>
+                <h2 class="font-orbitron text-3xl font-black text-white tracking-wide mb-2">AIM PRACTICE 2D</h2>
+                <p class="text-slate-400 text-sm mb-6">하늘색 타겟을 정확하고 빠르게 조준하여 사격하세요. 난이도, 조준점, 감도를 커스텀할 수 있습니다.</p>
+                
+                <div class="grid grid-cols-2 gap-3 text-left mb-6 bg-slate-900/90 p-4 rounded-xl border border-slate-800 text-xs text-slate-300">
+                    <div class="flex items-center gap-2"><i class="ph-fill ph-check-circle text-sky-400"></i> 타겟 색상: 하늘색 고정</div>
+                    <div class="flex items-center gap-2"><i class="ph-fill ph-check-circle text-sky-400"></i> 난이도: 1~10 단계</div>
+                    <div class="flex items-center gap-2"><i class="ph-fill ph-check-circle text-sky-400"></i> 크기: 제각각 자동 생성</div>
+                    <div class="flex items-center gap-2"><i class="ph-fill ph-check-circle text-sky-400"></i> 이동: 좌우 바운스 이동</div>
+                </div>
+
+                <button id="btn-start" class="w-full py-4 bg-sky-500 hover:bg-sky-400 text-slate-950 font-orbitron font-extrabold text-lg rounded-xl shadow-lg shadow-sky-500/30 hover:shadow-sky-400/50 transition-all transform active:scale-95 flex items-center justify-center gap-2">
+                    <i class="ph-bold ph-play text-xl"></i> 게임 시작 (START)
+                </button>
+            </div>
+        </div>
+
+        <!-- PAUSE SCREEN -->
+        <div id="overlay-pause" class="hidden absolute inset-0 bg-slate-950/80 backdrop-blur-sm flex flex-col items-center justify-center gap-6 z-10">
+            <div class="text-center">
+                <h2 class="font-orbitron text-3xl font-bold text-amber-400 mb-4">PAUSED</h2>
+                <div class="flex gap-4">
+                    <button id="btn-resume" class="px-6 py-3 bg-sky-500 text-slate-950 font-bold rounded-lg hover:bg-sky-400 transition">이어서 하기</button>
+                    <button id="btn-restart" class="px-6 py-3 bg-slate-800 text-slate-200 font-bold rounded-lg hover:bg-slate-700 transition">다시 시작</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- RESULTS MODAL -->
+        <div id="modal-result" class="hidden absolute inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 z-30">
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 w-full max-w-lg text-center shadow-2xl relative">
+                <div class="inline-flex p-3 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 mb-3">
+                    <i class="ph-bold ph-trophy text-3xl"></i>
+                </div>
+                <h3 class="font-orbitron text-2xl font-bold text-white mb-1">TRAINING COMPLETE</h3>
+                <p class="text-xs text-slate-400 mb-6">훈련 결과 리포트</p>
+
+                <!-- STATS SUMMARY GRID -->
+                <div class="grid grid-cols-2 gap-4 mb-6 font-orbitron text-left">
+                    <div class="bg-slate-950/60 p-4 rounded-xl border border-slate-800">
+                        <span class="text-xs text-slate-500 block">최종 점수 (Score)</span>
+                        <span id="res-score" class="text-2xl font-bold text-sky-400">0</span>
+                    </div>
+                    <div class="bg-slate-950/60 p-4 rounded-xl border border-slate-800">
+                        <span class="text-xs text-slate-500 block">명중률 (Accuracy)</span>
+                        <span id="res-accuracy" class="text-2xl font-bold text-emerald-400">0%</span>
+                    </div>
+                    <div class="bg-slate-950/60 p-4 rounded-xl border border-slate-800">
+                        <span class="text-xs text-slate-500 block">명중 / 사격 (Hits/Total)</span>
+                        <span id="res-hits" class="text-lg font-bold text-slate-200">0 / 0</span>
+                    </div>
+                    <div class="bg-slate-950/60 p-4 rounded-xl border border-slate-800">
+                        <span class="text-xs text-slate-500 block">평균 반응속도</span>
+                        <span id="res-reaction" class="text-lg font-bold text-purple-400">0 ms</span>
+                    </div>
+                </div>
+
+                <div class="flex gap-3">
+                    <button id="btn-result-restart" class="flex-1 py-3 bg-sky-500 hover:bg-sky-400 text-slate-950 font-orbitron font-bold rounded-xl transition">
+                        다시 도전
+                    </button>
+                    <button id="btn-result-close" class="px-5 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl transition">
+                        닫기
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- SETTINGS DRAWER / SIDEBAR PANEL -->
+    <aside id="panel-settings" class="fixed top-0 right-0 w-full sm:w-96 h-full bg-slate-900/95 backdrop-blur-xl border-l border-slate-800 p-6 z-40 transform translate-x-full transition-transform duration-300 overflow-y-auto flex flex-col justify-between">
+        <div>
+            <div class="flex justify-between items-center mb-6 pb-4 border-b border-slate-800">
+                <div class="flex items-center gap-2">
+                    <i class="ph-bold ph-sliders text-sky-400 text-xl"></i>
+                    <h2 class="font-orbitron font-bold text-lg text-white">커스텀 설정</h2>
+                </div>
+                <button id="btn-close-settings" class="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white">
+                    <i class="ph-bold ph-x text-xl"></i>
+                </button>
+            </div>
+
+            <!-- SETTINGS FORM SECTIONS -->
+            <div class="space-y-6 text-xs text-slate-300">
+
+                <!-- 1. DIFFICULTY LEVEL (1 to 10) -->
+                <div>
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="font-semibold text-slate-200">난이도 설정 (Difficulty Level)</label>
+                        <span id="val-difficulty" class="font-orbitron text-sky-400 font-bold text-sm">Level 5</span>
+                    </div>
+                    <input type="range" id="input-difficulty" min="1" max="10" value="5" class="w-full">
+                    <div class="flex justify-between text-[10px] text-slate-500 mt-1">
+                        <span>Lv.1 (느림/대형)</span>
+                        <span>Lv.10 (초고속/소형)</span>
+                    </div>
+                </div>
+
+                <!-- 2. SENSITIVITY MULTIPLIER -->
+                <div>
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="font-semibold text-slate-200">마우스 감도 (Sensitivity)</label>
+                        <span id="val-sensitivity" class="font-orbitron text-sky-400 font-bold text-sm">1.0x</span>
+                    </div>
+                    <input type="range" id="input-sensitivity" min="0.1" max="3.0" step="0.1" value="1.0" class="w-full">
+                    <p class="text-[10px] text-slate-500 mt-1">소프트웨어 조준선 이동 감도를 조절합니다.</p>
+                </div>
+
+                <!-- 3. CROSSHAIR CUSTOMIZATION -->
+                <div class="pt-4 border-t border-slate-800 space-y-4">
+                    <h3 class="font-orbitron text-sky-400 font-bold text-sm tracking-wide">조준점(Crosshair) 커스텀</h3>
+
+                    <!-- Crosshair Type -->
+                    <div>
+                        <label class="block mb-2 font-medium text-slate-300">조준점 모양</label>
+                        <div class="grid grid-cols-3 gap-2">
+                            <button class="btn-ch-type px-3 py-2 bg-slate-800 rounded border border-sky-500 text-sky-400 font-medium" data-type="cross">십자가 (+)</button>
+                            <button class="btn-ch-type px-3 py-2 bg-slate-800 rounded border border-transparent text-slate-400 font-medium" data-type="dot">점 (Dot)</button>
+                            <button class="btn-ch-type px-3 py-2 bg-slate-800 rounded border border-transparent text-slate-400 font-medium" data-type="circle">원형 (Circle)</button>
+                        </div>
+                    </div>
+
+                    <!-- Crosshair Color -->
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <label class="font-medium text-slate-300">조준점 색상</label>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <input type="color" id="input-ch-color" value="#00ffcc" class="w-10 h-10 bg-transparent border-0 cursor-pointer rounded">
+                            <span id="val-ch-color" class="font-mono text-slate-400 uppercase">#00FFCC</span>
+                        </div>
+                    </div>
+
+                    <!-- Crosshair Size -->
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="font-medium text-slate-300">크기 (Length)</label>
+                            <span id="val-ch-size" class="font-mono text-slate-400">10px</span>
+                        </div>
+                        <input type="range" id="input-ch-size" min="4" max="30" value="10" class="w-full">
+                    </div>
+
+                    <!-- Crosshair Thickness -->
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="font-medium text-slate-300">두께 (Thickness)</label>
+                            <span id="val-ch-thick" class="font-mono text-slate-400">2px</span>
+                        </div>
+                        <input type="range" id="input-ch-thick" min="1" max="8" value="2" class="w-full">
+                    </div>
+
+                    <!-- Crosshair Gap -->
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="font-medium text-slate-300">간격 (Gap)</label>
+                            <span id="val-ch-gap" class="font-mono text-slate-400">4px</span>
+                        </div>
+                        <input type="range" id="input-ch-gap" min="0" max="20" value="4" class="w-full">
+                    </div>
+                </div>
+
+                <!-- 4. GAME TIME DURATION -->
+                <div class="pt-4 border-t border-slate-800">
+                    <label class="block mb-2 font-semibold text-slate-200">게임 시간 설정</label>
+                    <select id="select-duration" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-sky-500">
+                        <option value="15">15 초 (Quick Practice)</option>
+                        <option value="30" selected>30 초 (Standard Mode)</option>
+                        <option value="60">60 초 (Endurance)</option>
+                    </select>
+                </div>
+
+            </div>
+        </div>
+
+        <button id="btn-save-settings" class="mt-6 w-full py-3 bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold rounded-xl font-orbitron transition">
+            설정 적용 및 닫기
+        </button>
+    </aside>
+
+    <!-- FOOTER INSTRUCTIONS -->
+    <footer class="w-full bg-slate-900/60 border-t border-slate-800/80 px-6 py-2 text-center text-[11px] text-slate-500 flex justify-between items-center">
+        <span><kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700 text-slate-300">ESC</kbd> 일시정지</span>
+        <span>Sky Blue Targets • Infinite Spawns • Horizontal Movement</span>
+        <span>Aim Lab Engine v1.0</span>
+    </footer>
+
+    <!-- JAVASCRIPT GAME LOGIC -->
+    <script>
+        // --- SOUND ENGINE (Web Audio API Synthesizer - No External Files) ---
+        class SoundEngine {
+            constructor() {
+                this.ctx = null;
+                this.muted = false;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            }
+
+            playHit() {
+                if (this.muted) return;
+                this.init();
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(800, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(400, this.ctx.currentTime + 0.08);
+
+                gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.08);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.08);
+            }
+
+            playMiss() {
+                if (this.muted) return;
+                this.init();
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(80, this.ctx.currentTime + 0.1);
+
+                gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.1);
+            }
+        }
+
+        const audio = new SoundEngine();
+
+        // --- GAME CONFIG & STATE ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let gameState = 'START'; // START, PLAYING, PAUSED, END
+        let animationFrameId = null;
+
+        // Custom Mouse / Crosshair Position
+        let mouseX = 0;
+        let mouseY = 0;
+
+        // Settings State
+        const settings = {
+            difficulty: 5,
+            sensitivity: 1.0,
+            crosshair: {
+                type: 'cross', // cross, dot, circle
+                color: '#00ffcc',
+                size: 10,
+                thickness: 2,
+                gap: 4
+            },
+            duration: 30
+        };
+
+        // Game Metrics & Gameplay Variables
+        let targets = [];
+        let particles = [];
+        let ripples = [];
+
+        let gameTimer = 30;
+        let lastTime = 0;
+        let spawnTimer = 0;
+
+        let stats = {
+            score: 0,
+            hits: 0,
+            shots: 0,
+            reactionTimes: [],
+            lastSpawnTime: 0
+        };
+
+        // --- TARGET CLASS (Sky Blue Circles with Horizontal Movement) ---
+        class Target {
+            constructor(canvasWidth, canvasHeight, level) {
+                // Difficulty Scaling Parameters (1 to 10)
+                // Radius gets smaller with level
+                const minR = Math.max(12, 35 - level * 2.2);
+                const maxR = Math.max(22, 55 - level * 2.8);
+                this.radius = Math.random() * (maxR - minR) + minR;
+
+                this.x = Math.random() * (canvasWidth - this.radius * 4) + this.radius * 2;
+                this.y = Math.random() * (canvasHeight - this.radius * 4) + this.radius * 2;
+
+                // Horizontal Movement Speed (Scaling with difficulty)
+                const baseSpeed = 1.0 + (level * 0.45);
+                this.vx = (Math.random() < 0.5 ? -1 : 1) * (baseSpeed + Math.random() * 0.8);
+                
+                // Target Disappear Lifespan (seconds) - Shorter at higher levels
+                this.maxLifespan = Math.max(0.8, 3.5 - (level * 0.25)); 
+                this.lifespan = this.maxLifespan;
+                
+                this.createdAt = performance.now();
+                
+                // Sky Blue Color Fixed (#38bdf8 / rgb(56, 189, 248))
+                this.color = '#38bdf8'; 
+                this.shrinkProgress = 1.0;
+            }
+
+            update(dt, width) {
+                // Update Lifespan
+                this.lifespan -= dt;
+
+                // Shrink ratio for visual countdown ring
+                this.shrinkProgress = Math.max(0, this.lifespan / this.maxLifespan);
+
+                // Horizontal Bounce Movement
+                this.x += this.vx;
+
+                // Bounce off left/right edges
+                if (this.x - this.radius <= 10) {
+                    this.x = this.radius + 10;
+                    this.vx *= -1;
+                } else if (this.x + this.radius >= width - 10) {
+                    this.x = width - this.radius - 10;
+                    this.vx *= -1;
+                }
+            }
+
+            draw(ctx) {
+                ctx.save();
+                
+                // Outer Glow Effect
+                ctx.shadowColor = 'rgba(56, 189, 248, 0.6)';
+                ctx.shadowBlur = 12;
+
+                // Main Circle (Sky Blue)
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+
+                // Inner Target Ring (Visual Accent)
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius * 0.5, 0, Math.PI * 2);
+                ctx.fillStyle = '#ffffff';
+                ctx.globalAlpha = 0.8;
+                ctx.fill();
+
+                // Inner Bullseye Dot
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius * 0.2, 0, Math.PI * 2);
+                ctx.fillStyle = '#0284c7';
+                ctx.fill();
+
+                // Outer Disappearing Timer Ring
+                ctx.globalAlpha = 0.5;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius + 4, -Math.PI / 2, (-Math.PI / 2) + (Math.PI * 2 * this.shrinkProgress));
+                ctx.strokeStyle = '#7dd3fc';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.restore();
+            }
+
+            isHit(px, py) {
+                const dist = Math.hypot(this.x - px, this.y - py);
+                return dist <= this.radius;
+            }
+        }
+
+        // --- VISUAL EFFECTS: PARTICLES & RIPPLES ---
+        class HitParticle {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.vx = (Math.random() - 0.5) * 6;
+                this.vy = (Math.random() - 0.5) * 6;
+                this.radius = Math.random() * 3 + 1.5;
+                this.alpha = 1.0;
+                this.color = '#38bdf8';
+            }
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.alpha -= 0.04;
+            }
+            draw(ctx) {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, this.alpha);
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        class ShotRipple {
+            constructor(x, y, isHit) {
+                this.x = x;
+                this.y = y;
+                this.radius = 2;
+                this.maxRadius = isHit ? 24 : 12;
+                this.alpha = 0.8;
+                this.color = isHit ? '#38bdf8' : '#f43f5e'; // Skyblue if hit, Red if miss
+            }
+            update() {
+                this.radius += 1.8;
+                this.alpha -= 0.05;
+            }
+            draw(ctx) {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, this.alpha);
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
+
+        // --- CANVAS RESIZE ENGINE ---
+        function resizeCanvas() {
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // --- MOUSE TRACKING WITH SENSITIVITY MULTIPLIER ---
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const rawX = e.clientX - rect.left;
+            const rawY = e.clientY - rect.top;
+
+            if (gameState === 'PLAYING') {
+                // Apply sensitivity multiplier relative to center offset
+                const deltaX = (rawX - mouseX) * settings.sensitivity;
+                const deltaY = (rawY - mouseY) * settings.sensitivity;
+
+                mouseX += deltaX;
+                mouseY += deltaY;
+
+                // Clamp to screen bounds
+                mouseX = Math.max(0, Math.min(canvas.width, mouseX));
+                mouseY = Math.max(0, Math.min(canvas.height, mouseY));
+            } else {
+                mouseX = rawX;
+                mouseY = rawY;
+            }
+        });
+
+        // --- SHOOTING / CLICK MECHANICS ---
+        canvas.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return; // Left Click Only
+
+            if (gameState === 'PLAYING') {
+                stats.shots++;
+                let hitAny = false;
+
+                // Check Target Collisions (Reverse loop to hit top rendered first)
+                for (let i = targets.length - 1; i >= 0; i--) {
+                    const t = targets[i];
+                    if (t.isHit(mouseX, mouseY)) {
+                        hitAny = true;
+                        stats.hits++;
+                        stats.score += Math.round(100 * (settings.difficulty * 0.5));
+
+                        // Calculate reaction time
+                        const reactionTime = performance.now() - t.createdAt;
+                        stats.reactionTimes.push(reactionTime);
+
+                        // Audio & Spawn Burst Particles
+                        audio.playHit();
+                        for (let p = 0; p < 12; p++) {
+                            particles.push(new HitParticle(t.x, t.y));
+                        }
+                        ripples.push(new ShotRipple(mouseX, mouseY, true));
+
+                        // Remove Target
+                        targets.splice(i, 1);
+                        break;
+                    }
+                }
+
+                if (!hitAny) {
+                    stats.score = Math.max(0, stats.score - 20);
+                    audio.playMiss();
+                    ripples.push(new ShotRipple(mouseX, mouseY, false));
+                }
+
+                updateStatsUI();
+            }
+        });
+
+        // --- TARGET SPAWNER LOGIC ---
+        function spawnTarget() {
+            // Maximum targets concurrently on screen scales with level
+            const maxTargetsOnScreen = Math.min(6, Math.floor(2 + settings.difficulty * 0.4));
+            if (targets.length < maxTargetsOnScreen) {
+                targets.push(new Target(canvas.width, canvas.height, settings.difficulty));
+            }
+        }
+
+        // --- UI STATS UPDATER ---
+        function updateStatsUI() {
+            document.getElementById('stat-time').textContent = `${gameTimer.toFixed(1)}s`;
+            document.getElementById('stat-score').textContent = stats.score;
+            
+            const acc = stats.shots > 0 ? Math.round((stats.hits / stats.shots) * 100) : 100;
+            document.getElementById('stat-accuracy').textContent = `${acc}%`;
+
+            const avgReaction = stats.reactionTimes.length > 0 
+                ? Math.round(stats.reactionTimes.reduce((a, b) => a + b, 0) / stats.reactionTimes.length) 
+                : 0;
+            document.getElementById('stat-reaction').textContent = `${avgReaction} ms`;
+        }
+
+        // --- DRAW CUSTOM CROSSHAIR ---
+        function drawCrosshair(ctx, x, y) {
+            const ch = settings.crosshair;
+            ctx.save();
+            ctx.strokeStyle = ch.color;
+            ctx.fillStyle = ch.color;
+            ctx.lineWidth = ch.thickness;
+
+            const size = parseInt(ch.size);
+            const gap = parseInt(ch.gap);
+
+            if (ch.type === 'cross' || ch.type === 'dot') {
+                // Top, Bottom, Left, Right Lines
+                if (ch.type === 'cross') {
+                    ctx.beginPath();
+                    // Top
+                    ctx.moveTo(x, y - gap);
+                    ctx.lineTo(x, y - gap - size);
+                    // Bottom
+                    ctx.moveTo(x, y + gap);
+                    ctx.lineTo(x, y + gap + size);
+                    // Left
+                    ctx.moveTo(x - gap, y);
+                    ctx.lineTo(x - gap - size, y);
+                    // Right
+                    ctx.moveTo(x + gap, y);
+                    ctx.lineTo(x + gap + size, y);
+                    ctx.stroke();
+                }
+                // Center Dot
+                ctx.beginPath();
+                ctx.arc(x, y, ch.thickness, 0, Math.PI * 2);
+                ctx.fill();
+
+            } else if (ch.type === 'circle') {
+                ctx.beginPath();
+                ctx.arc(x, y, gap + size / 2, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(x, y, ch.thickness, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            ctx.restore();
+        }
+
+        // --- MAIN GAME LOOP ---
+        function gameLoop(timestamp) {
+            if (!lastTime) lastTime = timestamp;
+            const dt = (timestamp - lastTime) / 1000;
+            lastTime = timestamp;
+
+            // CLEAR CANVAS
+            ctx.fillStyle = '#0b0f19';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // DRAW BACKGROUND GRID PATTERN
+            ctx.strokeStyle = 'rgba(30, 41, 59, 0.4)';
+            ctx.lineWidth = 1;
+            const gridSize = 40;
+            for (let x = 0; x < canvas.width; x += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            for (let y = 0; y < canvas.height; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+
+            if (gameState === 'PLAYING') {
+                // Update Game Timer
+                gameTimer -= dt;
+                if (gameTimer <= 0) {
+                    gameTimer = 0;
+                    endGame();
+                }
+                updateStatsUI();
+
+                // Spawn Target Logic Frequency
+                spawnTimer += dt;
+                const spawnInterval = Math.max(0.2, 1.2 - (settings.difficulty * 0.09));
+                if (spawnTimer >= spawnInterval) {
+                    spawnTarget();
+                    spawnTimer = 0;
+                }
+
+                // Update & Render Targets
+                for (let i = targets.length - 1; i >= 0; i--) {
+                    const t = targets[i];
+                    t.update(dt, canvas.width);
+                    t.draw(ctx);
+
+                    // Remove if expired
+                    if (t.lifespan <= 0) {
+                        targets.splice(i, 1);
+                    }
+                }
+
+                // Update & Render Particles
+                for (let i = particles.length - 1; i >= 0; i--) {
+                    const p = particles[i];
+                    p.update();
+                    p.draw(ctx);
+                    if (p.alpha <= 0) particles.splice(i, 1);
+                }
+
+                // Update & Render Ripples
+                for (let i = ripples.length - 1; i >= 0; i--) {
+                    const r = ripples[i];
+                    r.update();
+                    r.draw(ctx);
+                    if (r.alpha <= 0) ripples.splice(i, 1);
+                }
+            }
+
+            // Draw Crosshair on Top
+            drawCrosshair(ctx, mouseX, mouseY);
+
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        // --- GAME CONTROL FUNCTIONS ---
+        function startGame() {
+            gameState = 'PLAYING';
+            gameTimer = parseFloat(settings.duration);
+            stats = { score: 0, hits: 0, shots: 0, reactionTimes: [] };
+            targets = [];
+            particles = [];
+            ripples = [];
+            spawnTimer = 0;
+            lastTime = performance.now();
+
+            document.getElementById('overlay-start').classList.add('hidden');
+            document.getElementById('overlay-pause').classList.add('hidden');
+            document.getElementById('modal-result').classList.add('hidden');
+
+            spawnTarget();
+        }
+
+        function pauseGame() {
+            if (gameState === 'PLAYING') {
+                gameState = 'PAUSED';
+                document.getElementById('overlay-pause').classList.remove('hidden');
+            }
+        }
+
+        function resumeGame() {
+            if (gameState === 'PAUSED') {
+                gameState = 'PLAYING';
+                lastTime = performance.now();
+                document.getElementById('overlay-pause').classList.add('hidden');
+            }
+        }
+
+        function endGame() {
+            gameState = 'END';
+            
+            // Populate Results Modal
+            document.getElementById('res-score').textContent = stats.score;
+            const acc = stats.shots > 0 ? Math.round((stats.hits / stats.shots) * 100) : 0;
+            document.getElementById('res-accuracy').textContent = `${acc}%`;
+            document.getElementById('res-hits').textContent = `${stats.hits} / ${stats.shots}`;
+
+            const avgReaction = stats.reactionTimes.length > 0 
+                ? Math.round(stats.reactionTimes.reduce((a, b) => a + b, 0) / stats.reactionTimes.length) 
+                : 0;
+            document.getElementById('res-reaction').textContent = `${avgReaction} ms`;
+
+            document.getElementById('modal-result').classList.remove('hidden');
+        }
+
+        // --- UI & EVENT LISTENERS ---
+        document.getElementById('btn-start').addEventListener('click', startGame);
+        document.getElementById('btn-resume').addEventListener('click', resumeGame);
+        document.getElementById('btn-restart').addEventListener('click', startGame);
+        document.getElementById('btn-result-restart').addEventListener('click', startGame);
+        document.getElementById('btn-result-close').addEventListener('click', () => {
+            document.getElementById('modal-result').classList.add('hidden');
+            document.getElementById('overlay-start').classList.remove('hidden');
+            gameState = 'START';
+        });
+
+        // ESC Key Pause
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                if (gameState === 'PLAYING') pauseGame();
+                else if (gameState === 'PAUSED') resumeGame();
+            }
+        });
+
+        // Settings Panel Controls
+        const panelSettings = document.getElementById('panel-settings');
+        document.getElementById('btn-settings').addEventListener('click', () => {
+            if (gameState === 'PLAYING') pauseGame();
+            panelSettings.classList.remove('translate-x-full');
+        });
+        document.getElementById('btn-close-settings').addEventListener('click', () => {
+            panelSettings.classList.add('translate-x-full');
+        });
+        document.getElementById('btn-save-settings').addEventListener('click', () => {
+            panelSettings.classList.add('translate-x-full');
+        });
+
+        // Sound Toggle
+        const btnSound = document.getElementById('btn-sound');
+        const iconSound = document.getElementById('icon-sound');
+        btnSound.addEventListener('click', () => {
+            audio.muted = !audio.muted;
+            if (audio.muted) {
+                iconSound.className = 'ph-bold ph-speaker-slash text-lg text-rose-400';
+            } else {
+                iconSound.className = 'ph-bold ph-speaker-high text-lg text-sky-400';
+            }
+        });
+
+        // Settings Inputs Bindings
+        const inputDifficulty = document.getElementById('input-difficulty');
+        const valDifficulty = document.getElementById('val-difficulty');
+        inputDifficulty.addEventListener('input', (e) => {
+            settings.difficulty = parseInt(e.target.value);
+            valDifficulty.textContent = `Level ${settings.difficulty}`;
+        });
+
+        const inputSensitivity = document.getElementById('input-sensitivity');
+        const valSensitivity = document.getElementById('val-sensitivity');
+        inputSensitivity.addEventListener('input', (e) => {
+            settings.sensitivity = parseFloat(e.target.value);
+            valSensitivity.textContent = `${settings.sensitivity.toFixed(1)}x`;
+        });
+
+        const inputChColor = document.getElementById('input-ch-color');
+        const valChColor = document.getElementById('val-ch-color');
+        inputChColor.addEventListener('input', (e) => {
+            settings.crosshair.color = e.target.value;
+            valChColor.textContent = e.target.value.toUpperCase();
+        });
+
+        const inputChSize = document.getElementById('input-ch-size');
+        const valChSize = document.getElementById('val-ch-size');
+        inputChSize.addEventListener('input', (e) => {
+            settings.crosshair.size = e.target.value;
+            valChSize.textContent = `${e.target.value}px`;
+        });
+
+        const inputChThick = document.getElementById('input-ch-thick');
+        const valChThick = document.getElementById('val-ch-thick');
+        inputChThick.addEventListener('input', (e) => {
+            settings.crosshair.thickness = e.target.value;
+            valChThick.textContent = `${e.target.value}px`;
+        });
+
+        const inputChGap = document.getElementById('input-ch-gap');
+        const valChGap = document.getElementById('val-ch-gap');
+        inputChGap.addEventListener('input', (e) => {
+            settings.crosshair.gap = e.target.value;
+            valChGap.textContent = `${e.target.value}px`;
+        });
+
+        document.querySelectorAll('.btn-ch-type').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.btn-ch-type').forEach(b => {
+                    b.classList.remove('border-sky-500', 'text-sky-400');
+                    b.classList.add('border-transparent', 'text-slate-400');
+                });
+                const target = e.currentTarget;
+                target.classList.remove('border-transparent', 'text-slate-400');
+                target.classList.add('border-sky-500', 'text-sky-400');
+                settings.crosshair.type = target.dataset.type;
+            });
+        });
+
+        document.getElementById('select-duration').addEventListener('change', (e) => {
+            settings.duration = parseInt(e.target.value);
+            document.getElementById('stat-time').textContent = `${settings.duration}.0s`;
+        });
+
+        // START ENGINE LOOP
+        window.onload = () => {
+            requestAnimationFrame(gameLoop);
+        };
+    </script>
+</body>
+</html>
